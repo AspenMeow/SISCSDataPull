@@ -28,7 +28,7 @@ class stdntterm:
     def termenrl(self):
         df = pd.read_sql("select * from (select a.emplid,a.strm,a.term_descrshort,  a.acad_career, a.degree_career,a.enrollment_status, \
          a.residency, a.admission_res, a.tuition_res,fin_aid_fed_res,\
-         a.acad_level_bot, a.TOT_PROJ_UNITS, x.XLATSHORTNAME, a.acad_plan, c.acad_plan_descr,\
+         a.acad_level_bot, a.TOT_PROJ_UNITS, x.XLATSHORTNAME as acad_level_bot_short_descr, x.XLATLONGNAME as acad_level_bot_long_descr,  a.acad_plan, c.acad_plan_descr,\
          c.acad_plan_u1, acad_plan_u1_descrformal, acad_plan_mau, acad_plan_mau_descrformal, b.citizenship_status, b.citizenship_descrshort, b.sex, \
          b.IPEDS_RACE_ETHNICITY,b.res_country, b.res_state, b.res_county,b.res_city,count(*) over (partition by a.emplid, a.acad_career, a.institution order by x.effdt desc ) as cnt \
         from  siscs.r_studentterm_rv a  inner join siscs.r_stdntbiodemo_rv b on a.emplid =b.emplid \
