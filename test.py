@@ -8,6 +8,6 @@ print(st.term)
 #print(st2.term)
 
 
-#df = st.enrlsch()
+df = st.race();
 #print(df.columns)
-#print(df.head())
+print(df.head())
