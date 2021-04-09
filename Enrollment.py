@@ -159,5 +159,26 @@ class stdntterm:
         df = pd.read_sql(sql, ct.EDW)
         return df
 
+    def enrlschbase(self, date):
+        sql= " select b.emplid, b.acad_career, res.residency ,res.admission_res  ,res.tuition_res ,res.FIN_AID_FED_RES, sum(a.unt_taken) as sum_unt_taken, \
+        sum(unt_billing) as sum_unt_billing from siscs.p_stdnt_enrl_av a inner join siscs.P_STDNT_CAR_TERM_av b on a.emplid=b.emplid \
+         and a.strm=b.strm and a.acad_career=b.acad_career  inner join siscs.p_residency_off_av res   on a.emplid=res.emplid \
+          and a.acad_career=res.acad_career and a.institution=res.institution and  '"+date+ "' between res.edw_eff_start_date and res.edw_eff_end_date \
+            and res.effective_term= ( select max(effective_term) from siscs.p_residency_off_av r where b.emplid= r.emplid   and  b.acad_career= r.acad_career \
+        and b.institution= r.institution  and '"+date+"' between r.edw_eff_start_date and r.edw_eff_end_date and b.strm >= r.effective_term) \
+        where a.strm="+self.term +" and a.stdnt_enrl_status='E'  and (  b.ELIG_TO_ENROLL='Y'     or withdraw_code <> 'WDR') and '"+date+"' between a.edw_eff_start_date \
+        and a.edw_eff_end_date  and '"+date+"' between b.edw_eff_start_date and b.edw_eff_end_date group by b.emplid, b.acad_career,res.residency  ,\
+        res.admission_res  ,res.tuition_res  ,res.FIN_AID_FED_RES"
+        df= pd.read_sql(sql,ct.EDW)
+        return df
+
+    def enrlschagg(self,date):
+        basedf = self.enrlschbase(date)
+        df1= basedf.groupby(['acad_career','tuition_res'])['sum_unt_taken','sum_unt_billing'].sum()
+        df = basedf.groupby(['acad_career','tuition_res']).size().reset_index().join(df1, on=['acad_career','tuition_res'])
+        df.columns=['acad_career', 'tuition_res', 'N', 'sum_unt_taken', 'sum_unt_billing']
+        df['Date']=date
+        return df
+
 
 
