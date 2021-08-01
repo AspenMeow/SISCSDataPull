@@ -160,23 +160,34 @@ class stdntterm:
         return df
 
     def enrlschbase(self, date):
-        sql= " select b.emplid, b.acad_career, res.residency ,res.admission_res  ,res.tuition_res ,res.FIN_AID_FED_RES, sum(a.unt_taken) as sum_unt_taken, \
+        sql= " select b.emplid,b.strm, b.acad_career, b.billing_career, res.residency ,res.admission_res  ,res.tuition_res ,res.FIN_AID_FED_RES, sum(a.unt_taken) as sum_unt_taken, \
         sum(unt_billing) as sum_unt_billing from siscs.p_stdnt_enrl_av a inner join siscs.P_STDNT_CAR_TERM_av b on a.emplid=b.emplid \
-         and a.strm=b.strm and a.acad_career=b.acad_career  inner join siscs.p_residency_off_av res   on a.emplid=res.emplid \
+         and a.strm=b.strm   inner join siscs.p_residency_off_av res   on a.emplid=res.emplid \
           and a.acad_career=res.acad_career and a.institution=res.institution and  '"+date+ "' between res.edw_eff_start_date and res.edw_eff_end_date \
             and res.effective_term= ( select max(effective_term) from siscs.p_residency_off_av r where b.emplid= r.emplid   and  b.acad_career= r.acad_career \
         and b.institution= r.institution  and '"+date+"' between r.edw_eff_start_date and r.edw_eff_end_date and b.strm >= r.effective_term) \
         where a.strm="+self.term +" and a.stdnt_enrl_status='E'  and (  b.ELIG_TO_ENROLL='Y'     or withdraw_code <> 'WDR') and '"+date+"' between a.edw_eff_start_date \
-        and a.edw_eff_end_date  and '"+date+"' between b.edw_eff_start_date and b.edw_eff_end_date group by b.emplid, b.acad_career,res.residency  ,\
+        and a.edw_eff_end_date  and '"+date+"' between b.edw_eff_start_date and b.edw_eff_end_date group by b.emplid,b.strm, b.acad_career,b.billing_career,res.residency  ,\
         res.admission_res  ,res.tuition_res  ,res.FIN_AID_FED_RES"
         df= pd.read_sql(sql,ct.EDW)
+
+        fanum = pd.read_sql("SELECT * FROM ( \
+            SELECT ACAD_CAREER , FA_PRIMACY_NBR , ROW_NUMBER() OVER (PARTITION BY INSTITUTION, ACAD_CAREER ORDER BY EFFDT) AS cnt \
+            FROM siscs.S_ACAD_CAR_TBL_V sactv WHERE EFFDT <=SYSDATE ) WHERE cnt=1", ct.EDW)
+
+        df= df.join(fanum.set_index('acad_career'), on='acad_career').drop('cnt', 1)
+        df['fanummin']= df.groupby(['emplid','strm'])['fa_primacy_nbr'].transform(min)
+        df['bill']=np.where(df['acad_career']==df['billing_career'],1,0)
+        df['billcnt']= df.groupby(['emplid','strm'])['bill'].transform(sum)
+        df['primary']= np.where((df['billcnt']==1 ) & (df['acad_career']==df['billing_career']) | (df['billcnt']>1 ) & (df['fanummin']==df['fa_primacy_nbr']),1,0)
         return df
 
     def enrlschagg(self,date):
-        basedf = self.enrlschbase(date)
-        df1= basedf.groupby(['acad_career','tuition_res'])['sum_unt_taken','sum_unt_billing'].sum()
-        df = basedf.groupby(['acad_career','tuition_res']).size().reset_index().join(df1, on=['acad_career','tuition_res'])
-        df.columns=['acad_career', 'tuition_res', 'N', 'sum_unt_taken', 'sum_unt_billing']
+        basedf = self.enrlschbase(date).query('primary==1')
+        #df1= basedf.groupby(['acad_career','tuition_res'])['sum_unt_taken','sum_unt_billing'].sum()
+        df = basedf.groupby(['acad_career','tuition_res']).size().unstack()
+        df['ttl']=df.sum(axis=1)
+        #df.columns=['acad_career', 'tuition_res', 'N', 'sum_unt_taken', 'sum_unt_billing']
         df['Date']=date
         return df
 
